@@ -1,37 +1,21 @@
 name: Build
-run-name: Build railx for NeoForged 1.21.1
+run-name: Build railx for NeoForge 1.21.1
+
 on:
-  workflow_dispatch: { }
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Read build metadata
-        id: meta
-        uses: BrycensRanch/read-properties-action@v1
-        with:
-          file: build.properties
-          all: true
-
-      - id: update_version
-        name: Update version
-        uses: ./tools/create-release
-        with:
-          previous_tag_format: 'mc[\d.]+-$1'
-          tag_format: 'mc1.21.1-$1'
-          prerelease: true
-          prerelease_suffix: build
-          auto_increment_type: prerelease
-          tag_schema: semantic
-          minimum_version: ${{ steps.meta.outputs.version }}
-          dry_run: true
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/checkout@v4
 
       - name: Setup Java 21
         uses: actions/setup-java@v4
@@ -40,29 +24,14 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
-        with:
-          cache-read-only: false
-          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Build
-        run: ./gradlew :forge:build
-        env:
-          project_version: ${{ steps.update_version.outputs.version }}
+        run: ./gradlew :forge:build --no-daemon
 
-      - name: Release build artifacts
-        uses: ./tools/create-release
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
-          prerelease: true
-          release_name: RailX {{version}} for NeoForge 1.21.1
-          body: |
-            Automatic build release.
-            This mod is **under development**, so be sure to backup before joining the world. Might have plenty of bugs.
-            
-            For Minecraft `1.21.1`, NeoForge `21.1.219+`, Create `6.0.10+`. **Requires [Kotlin for Forge](https://modrinth.com/mod/kotlin-for-forge) mod dependency.**
-
-            ### Updates
-            {{{diff}}}
-          artifacts:
-            modules/forge/build/libs/*
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          name: railx-build
+          path: modules/forge/build/libs/*.jar
+          if-no-files-found: error
